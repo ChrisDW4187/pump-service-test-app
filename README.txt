@@ -1,3 +1,5 @@
-Pump Service Test - standalone web app
-Open index.html in a modern browser. For installation as a home-screen PWA and reliable sharing, host index.html over HTTPS (for example GitHub Pages or Netlify). Browser-local history is not synchronized or backed up automatically. Use Export history backup periodically.
-PDF: tap Print / Save as PDF, then use the device print dialog to save/share as PDF. Share report uses native text sharing where supported; PDF sharing uses the print dialog.
+Pump Service Test App — version 2
+See README.md for installation, GitHub Pages publishing, backups, limitations, and development instructions.
+Serve over HTTP locally or HTTPS in production; do not double-click index.html as a file.
+IMPORTANT: The original Excel service test workbook is missing from this repository. Upload the original .xlsx or .xls with formulas before validating test fields, calculations, units, and original report layout.
+Local data stays on this browser/device. Export backups after every test. No cross-device synchronization is provided.
