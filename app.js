@@ -1,3 +1,4 @@
+import { numericColumns, finalRows } from "./workbook.js";
 import { apparatus, setup, reading, extra, specs } from "./schema.js";
 import {
   STORE,
@@ -5,6 +6,10 @@ import {
   fresh,
   fmt,
   results,
+  sectionStats,
+  excessResults,
+  usesWorkbook,
+  cloneWithWorkbook,
   engineCounter,
   pumpCounter,
   issues,
@@ -14,14 +19,7 @@ import {
   parseBackup,
   mergeHistory,
 } from "./core.js";
-import {
-  esc,
-  summary,
-  reportHTML,
-  createPDF,
-  filename,
-  download,
-} from "./report.js";
+import { esc, reportHTML, createPDF, filename, download } from "./report.js";
 const $ = (id) => document.getElementById(id),
   steps = [
     "Apparatus",
@@ -129,14 +127,21 @@ const layoutFields = [
 ];
 function metricHTML(i) {
   const r = results(data, i);
+  const stats = sectionStats(data, i);
   return `<div class="metrics">${[
     ["Average GPM", "gpm"],
     ["Average pitot PSI", "pitot"],
-    ["Engine RPM*", "engine"],
-    ["Pump RPM*", "pump"],
+    ["Engine RPM", "engine"],
+    ["Pump RPM", "pump"],
   ]
     .map(([l, k]) => `<div class="metric">${l}<b>${fmt(r[k])}</b></div>`)
-    .join("")}</div>`;
+    .join(
+      "",
+    )}</div><div class="scroll"><table><thead><tr><th>Workbook column</th><th>Totals</th><th>Average</th></tr></thead><tbody>${numericColumns.map(([, k, l]) => `<tr><th>${esc(l)}</th><td>${fmt(stats.totals[k])}</td><td>${fmt(stats.averages[k])}</td></tr>`).join("")}</tbody></table></div>`;
+}
+function excessHTML() {
+  const e = excessResults(data);
+  return `<div class="metrics"><div class="metric">Counter engine RPM · O29<b>${fmt(e.engine)}</b></div><div class="metric">Counter pump RPM · J29<b>${fmt(e.pump)}</b></div></div><p class="muted">J30 × F16 = engine speed; engine speed × F6 (150 PSI gear ratio) = pump speed.</p>`;
 }
 function errorHTML() {
   const a = issues(data);
@@ -145,6 +150,9 @@ function errorHTML() {
     : '<p class="notice">Required record fields are complete. The tester must assess the result; this app does not certify compliance.</p>';
 }
 function render() {
+  $("calculationStatus").textContent = usesWorkbook(data)
+    ? "Fields and formulas matched to the supplied June 2026 workbook. Blank counter factors produce zero; RPM averages include those zeros. Overall results are assessed by the tester."
+    : "Legacy record: earlier calculation behavior retained. Blank counter inputs are excluded from RPM averages. Use “Copy with workbook calculations” in Final results to keep the original and create an updated copy.";
   $("steps").innerHTML = steps
     .map(
       (s, i) =>
@@ -166,7 +174,7 @@ function render() {
       data.values,
     )}`;
   if (step === 1)
-    html = `<h1>Pump information & setup</h1><p class="notice">RPM calculations (*) retain the earlier app’s multiplication: actual counter × counter ratio, then × gear ratio. The engine/pump basis selector is retained as recorded information only. Confirm direction and basis against the missing workbook before relying on RPM results. Other unspecified units should be recorded in comments.</p>${grid(
+    html = `<h1>Pump information & setup</h1><p class="notice">Workbook formulas: actual counter × counter ratio gives engine RPM; engine RPM × the section gear ratio gives pump RPM. The sheet’s ENGINE or PUMP label does not switch formulas. Record unspecified units in comments. Enter ratios and all readings before assessing results.</p>${grid(
       apparatus.filter((f) => ["pump", "pumpSerial"].includes(f[0])),
       data.values,
     )}<h2>Setup & additional pump checks</h2>${grid(setup, data.values)}`;
@@ -174,12 +182,12 @@ function render() {
     let i = step - 2,
       t = data.tests[i],
       s = specs[i];
-    html = `<h1>${s.pct} capacity test</h1><p class="muted">${s.psi} PSI section from the existing app · ${s.count} readings. Confirm applicable test requirements with the original sheet.</p>${grid(layoutFields, t, `tests.${i}.`)}${t.rows.map((r, j) => `<section class="testrow"><h2>Reading ${j + 1} / ${s.count}</h2>${grid(reading, r, `tests.${i}.rows.${j}.`)}<p class="muted" id="rpm-${j}">Engine counter RPM*: ${fmt(engineCounter(data, r))} · Pump counter RPM*: ${fmt(pumpCounter(data, r, i))}</p></section>`).join("")}<h2>Calculated averages</h2><div id="metrics">${metricHTML(i)}</div><p class="muted">Blank or invalid readings are excluded. Partial averages do not indicate a completed test.</p>`;
+    html = `<h1>${s.pct} capacity test</h1><p class="muted">${s.psi} PSI section from the source workbook · ${s.count} readings. Record the actual test setup; workbook example layouts are not automatically applied.</p>${grid(layoutFields, t, `tests.${i}.`)}${t.rows.map((r, j) => `<section class="testrow"><h2>Reading ${j + 1} / ${s.count}</h2>${grid(reading, r, `tests.${i}.rows.${j}.`)}<p class="muted" id="rpm-${j}">Engine counter RPM: ${fmt(engineCounter(data, r))} · Pump counter RPM: ${fmt(pumpCounter(data, r, i))}</p></section>`).join("")}<h2>Workbook totals & averages</h2><div id="metrics">${metricHTML(i)}</div><p class="muted">${usesWorkbook(data) ? "Workbook RPM averages include zero from blank counter factors. Blank raw averages show — rather than #DIV/0!. Invalid values are retained and block completion." : "Legacy RPM averages exclude blank factors."} Partial results do not indicate a completed test.</p>`;
   }
   if (step === 5)
-    html = `<h1>Additional tests & sign-off</h1><p class="muted">Vacuum, pressure control and tank-to-pump fields are in Pump & setup. Enter excess power readings and comments here. Signature is a typed name.</p>${grid(extra, data.values)}`;
+    html = `<h1>Additional tests & sign-off</h1><p class="muted">Vacuum, pressure control and tank-to-pump fields are in Pump & setup. Enter excess power readings and comments here. Signature is a typed name.</p>${grid(extra, data.values)}<h2>Excess power calculated speeds</h2><div id="excessResults">${excessHTML()}</div>`;
   if (step === 6)
-    html = `<h1>Final results</h1><p class="muted">No automatic acceptance thresholds are applied. Record the tester’s overall assessment and its basis.</p>${grid(resultFields, data.values)}<div id="errors">${showErrors ? errorHTML() : ""}</div><div class="scroll"><table><thead><tr><th>Calculated result</th>${specs.map((s) => `<th>${s.pct}</th>`).join("")}</tr></thead><tbody>${[...summary, ["Changeover valve", "position"], ["Tip size (inches)", "tip"]].map(([l, k]) => `<tr><th>${esc(l)}</th>${data.tests.map((t, i) => `<td>${esc(k === "position" || k === "tip" ? t[k] : fmt(results(data, i)[k]))}</td>`).join("")}</tr>`).join("")}</tbody></table></div><div class="buttons"><button id="saveTest">Save completed test</button><button id="pdf">Download PDF</button><button id="share">Share Report</button><button id="print">Print / Save as PDF</button></div><p class="muted">PDFs include all readings, averages, comments, and typed signature. Workbook validation remains pending. Export JSON backups for restorable records.</p>`;
+    html = `<h1>Final results</h1><p class="muted">No automatic acceptance thresholds are applied. Record the tester’s overall assessment and its basis.</p>${grid(resultFields, data.values)}<div id="errors">${showErrors ? errorHTML() : ""}</div><div class="scroll"><table><thead><tr><th>Calculated result</th>${specs.map((s) => `<th>${s.pct}</th>`).join("")}</tr></thead><tbody>${finalRows.map(([l, k]) => `<tr><th>${esc(l)}</th>${data.tests.map((t, i) => `<td>${esc(k === "position" || k === "tip" ? t[k] : fmt(results(data, i)[k]))}</td>`).join("")}</tr>`).join("")}</tbody></table></div><div class="buttons"><button id="saveTest">Save completed test</button>${!usesWorkbook(data) ? '<button id="convertWorkbook">Copy with workbook calculations</button>' : ""}<button id="pdf">Download PDF</button><button id="share">Share Report</button><button id="print">Print / Save as PDF</button></div><p class="muted">PDFs include all readings, averages, comments, and typed signature. Workbook formulas are matched; legacy records retain their earlier calculation behavior. Export JSON backups for restorable records.</p>`;
   if (step === 7)
     html = `<h1>Saved test history</h1><label class="field">Search department, apparatus number, or test date<input id="search" type="search" value="${esc(search)}" placeholder="Search records…"></label><div id="historyRows"></div><div class="buttons"><button id="export">Export backup (history + draft)</button><button id="import">Import backup</button><input id="importFile" type="file" accept="application/json,.json" hidden>${readFailed ? '<button id="recovery">Export raw recovery data</button>' : ""}</div><p class="muted">Import merges records. Conflicting records are kept as separate copies. Imported drafts are offered for recovery without replacing the current draft automatically.</p>`;
   $("page").innerHTML = `<section class="panel">${html}</section>`;
@@ -210,9 +218,10 @@ function render() {
         data.tests[i].rows.forEach(
           (r, j) =>
             ($("rpm-" + j).textContent =
-              `Engine counter RPM*: ${fmt(engineCounter(data, r))} · Pump counter RPM*: ${fmt(pumpCounter(data, r, i))}`),
+              `Engine counter RPM: ${fmt(engineCounter(data, r))} · Pump counter RPM: ${fmt(pumpCounter(data, r, i))}`),
         );
       }
+      if (step === 5) $("excessResults").innerHTML = excessHTML();
       if (step === 6 && showErrors) {
         $("errors").innerHTML = errorHTML();
         bindErrors();
@@ -225,6 +234,20 @@ function render() {
     $("share").onclick = () => pdfAction(data, true);
     $("print").onclick = () => printTest(data);
     bindErrors();
+    if ($("convertWorkbook"))
+      $("convertWorkbook").onclick = () => {
+        if (
+          !confirm(
+            "Create a separate copy using workbook blank/zero calculations? Existing saved history stays unchanged. Export a backup first to keep the active legacy draft.",
+          )
+        )
+          return;
+        const copy = cloneWithWorkbook(data);
+        if (!write(DRAFT, copy)) return;
+        data = copy;
+        persist();
+        render();
+      };
   }
   if (step === 7) {
     renderHistory();

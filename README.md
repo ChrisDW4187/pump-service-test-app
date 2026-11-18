@@ -2,7 +2,7 @@
 
 A free, static, offline-capable PWA for apparatus pump test records. Runs on GitHub Pages with no accounts, paid services, backend, analytics, or device synchronization. All test data stays in the browser unless you export or share it.
 
-**Status: ready for supervised workflow field testing; original-workbook validation remains open.** The repository originally contained only `index.html` and `README.txt`. No Excel file was present. Upload the **original pump service test workbook (`.xlsx` or `.xls`), with all worksheets, formulas, units, and print areas intact** before final formula or report-layout sign-off. Do not replace it with a PDF or screenshot for formula validation. No workbook has been changed or overwritten.
+**Version 2.1: matched to the supplied June 2026 workbook for supervised field testing.** The source is `New Service Test Sheet June2026 copy.xlsx`, worksheet `November 2004` (the sheet retains this older name). All input fields and all 126 formulas are mapped in `tests/fixtures/workbook-reference.json`. Formula results are checked against recalculated synthetic workbook copies. See [VALIDATION.md](VALIDATION.md) for exact cell references, blank handling, and remaining device/department acceptance checks. The uploaded original was not modified or published to this repository.
 
 ## Publish on GitHub Pages
 
@@ -42,11 +42,15 @@ Local browser storage **does not synchronize across devices**, is not encrypted 
 
 **Download PDF** creates an actual letter-size PDF including every existing form field, all recorded readings, RPM calculations, averages, comments, typed signature, and the tester's overall result. **Share Report** sends that PDF through native file sharing when supported; unsupported or failed file sharing falls back to downloading it. Cancelling native sharing does not trigger a download. **Print / Save as PDF** preserves the browser print workflow and supports browser fonts for additional character sets.
 
-PDF report tables paginate with repeated headers and page numbers. These are complete interim reports, not a verified reproduction of the missing Excel print layout. Built-in PDF fonts support Western text; use browser **Print / Save as PDF** for names or comments outside that font's character set. Typed signatures record a name and are not cryptographically verified signatures. Follow department approval procedures.
+PDF report tables paginate with repeated headers and page numbers. Reports retain the workbook’s apparatus/setup order, reading-column order, totals/averages, excess-power position, ten-row final-results table, comments and signature statement. They paginate for letter-size readability rather than copying the source’s exact cell geometry; the workbook has no fixed print area or paper size. Built-in PDF fonts support Western text; use browser **Print / Save as PDF** for names or comments outside that font's character set. Typed signatures record a name and are not cryptographically verified signatures. Follow department approval procedures.
 
 ## Calculations and validation
 
-See [VALIDATION.md](VALIDATION.md) for the precise arithmetic and remaining workbook checks. Existing fields and measurement labels are retained in `schema.js`; no testing standards, acceptance limits, nozzle-flow formulas, or automatic pass/fail determinations have been added.
+See [VALIDATION.md](VALIDATION.md) for the precise arithmetic, source references, and test coverage. Workbook fields and measurement labels are retained in `schema.js`; no testing standards, acceptance limits, nozzle-flow formulas, or automatic pass/fail determinations have been added.
+
+New tests use the workbook’s multiplication and blank behavior: blank counter factors produce zero, and those calculated zeros count in RPM averages. Blank raw measurements are excluded from their averages. Totals include every numeric reading. Empty raw averages show “—” instead of Excel’s `#DIV/0!`. Missing measurements still need to be recorded before assessing a test.
+
+Older drafts/history retain the prior app’s RPM blank-exclusion behavior and display a Legacy record notice. In Final results, **Copy with workbook calculations** creates a separate record using workbook rules; existing saved history is preserved. Backups include the calculation version. Update every device before exchanging new-version records.
 
 The final result is selected by the tester: Pass, Fail, Incomplete, or Not assessed. Required record fields and Pass/Fail reading checks are app data-completeness rules only, not a claim of compliance with any standard. Record unperformed tests and limitations in comments/result basis.
 
@@ -65,7 +69,8 @@ npm run serve
 Open `http://localhost:4173/`. ES modules and service workers require HTTP/HTTPS; double-clicking `index.html` as a `file://` URL is no longer supported. Production hosting requires HTTPS. Development tests use localhost's secure-context exception.
 
 - `schema.js`: retained field definitions and legacy capacity sections.
-- `core.js`: pure arithmetic, validation, record/backup validation, history merge.
+- `core.js`: versioned arithmetic, totals/averages, excess-power speeds, validation, backups, history merge.
+- `workbook.js`: source identity, column/cell references, and final-results order.
 - `app.js`: form, local storage, workflow, PWA registration, sharing controls.
 - `report.js`: shared report content, PDF generation, browser printing.
 - `styles.css`, `manifest.webmanifest`, `sw.js`, `icons/`: appearance and offline installation.
@@ -73,5 +78,14 @@ Open `http://localhost:4173/`. ES modules and service workers require HTTP/HTTPS
 - `tests/`: unit and Chromium browser tests. Native OS share/install dialogs still require real-device checks.
 
 For updates, increment the cache version in `sw.js` whenever cached assets change. The new service worker waits for old tabs/windows to close, preventing mid-test code changes. Export a backup, close **all** app tabs/windows, reopen online, wait for **Offline ready**, and reload once. Caches are app assets only; clearing old app caches does not delete localStorage history. Browser “Clear site data” does delete records.
+
+To reproduce workbook reference data (development only), install Python `openpyxl` and LibreOffice, then run:
+
+```sh
+python scripts/validate-workbook.py "/path/to/New Service Test Sheet June2026 copy.xlsx" "/tmp/pump-workbook-validation"
+npm test
+```
+
+The script creates synthetic input copies and recalculates them in a separate directory; it never writes to the original. Only formula/input mappings and synthetic expected results are committed. The app does not need Excel or LibreOffice to run.
 
 See [FIELD-CHECKLIST.md](FIELD-CHECKLIST.md) before operational acceptance.

@@ -392,3 +392,22 @@ td button {
     width: 36%;
   }
 }
+
+@media print {
+  #printReport .reading-report {
+    font-size: 6px;
+    table-layout: fixed;
+  }
+  #printReport .reading-report th,
+  #printReport .reading-report td {
+    padding: 3px 1px;
+    width: auto;
+  }
+  #printReport th:first-child,
+  #printReport td:first-child {
+    width: auto;
+  }
+  #printReport h2 {
+    break-after: avoid;
+  }
+}

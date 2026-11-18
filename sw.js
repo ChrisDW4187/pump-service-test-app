@@ -1,11 +1,12 @@
 // Increment this version when changing any cached app asset.
-const CACHE = "pump-service-v2.0.0";
+const CACHE = "pump-service-v2.1.0";
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
   "./core.js",
+  "./workbook.js",
   "./schema.js",
   "./report.js",
   "./manifest.webmanifest",

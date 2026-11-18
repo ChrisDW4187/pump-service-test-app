@@ -42,11 +42,7 @@
         ><span id="network"></span>
       </div>
       <div id="storageError" role="alert" hidden></div>
-      <aside class="notice">
-        Workbook validation pending. Existing fields and RPM calculations are
-        retained from the earlier app; workbook formulas, units, and layout have
-        not been verified. Results are assessed by the tester.
-      </aside>
+      <aside id="calculationStatus" class="notice"></aside>
       <div class="progress-head">
         <span id="stepLabel"></span><span id="progressLabel"></span>
       </div>
@@ -78,8 +74,8 @@
         <p>
           Typed signatures record a name only. Follow your department’s review
           and signature procedures. For temperatures, elevation, engine
-          displacement, and torque, units were not specified in the earlier app;
-          record units in comments until the workbook is validated.
+          displacement, and torque, units are not specified in the source
+          workbook; record units in comments.
         </p>
         <button id="install" hidden>Install app</button>
       </details>

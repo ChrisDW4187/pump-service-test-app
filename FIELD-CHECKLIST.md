@@ -1,10 +1,10 @@
 # Supervised field acceptance
 
-Complete using training data first. Record device, OS, browser, app version/commit, test date, and reviewer. Workbook-dependent items cannot be signed off until the original workbook is provided.
+Complete using training data first. Record device, OS, browser, app version/commit, test date, and reviewer. The supplied workbook has been mapped and its formulas checked. Department review and actual-device acceptance still need sign-off.
 
-- [ ] Confirm every workbook field, measurement unit and section is represented (pending workbook).
-- [ ] Confirm formulas, counter basis/ratio direction and known-answer results (pending workbook).
-- [ ] Compare filled report with original worksheet print layout (pending workbook).
+- [ ] Confirm every workbook field, measurement unit and section is represented (source mapped; department review required).
+- [ ] Confirm formulas, counter basis/ratio direction and known-answer results (source mapped; department review required).
+- [ ] Compare filled report with original worksheet print layout (source mapped; department review required).
 - [ ] Publish on HTTPS GitHub Pages; install on actual iPhone, iPad, Android tablet and target desktop.
 - [ ] Wait for Offline ready; enable airplane mode; enter and navigate every section.
 - [ ] Close/reopen the installed app offline; confirm draft, calculations and history.

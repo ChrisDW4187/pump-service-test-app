@@ -126,8 +126,9 @@ test("PDF downloads, contains end comments and calculated values; sharing fallba
   expect(text).toContain("1500");
   expect(text).toContain("A Smith");
   expect(text).toContain("Incomplete");
-  expect(text).toContain("Reading 5");
-  expect(text).toContain("WORKBOOK VALIDATION PENDING");
+  expect(text).toContain("Totals");
+  expect(text).toContain("Average");
+  expect(text).toContain("June 2026 workbook formulas");
   page.once("dialog", (d) => d.accept());
   const fallback = page.waitForEvent("download");
   await page.getByRole("button", { name: "Share Report", exact: true }).click();
@@ -432,4 +433,70 @@ test("print action builds complete escaped report and unicode PDF asks for brows
   expect(warning.message()).toContain("Print / Save as PDF");
   await warning.accept();
   await clicking;
+});
+
+test("workbook totals, blank handling and excess-power speeds update live on mobile", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await page.locator('[data-step="1"]').click();
+  await set(page, "values.counterRatio", "2");
+  await set(page, "values.ratio150", "1.5");
+  await page.locator('[data-step="2"]').click();
+  await set(page, "tests.0.rows.0.actualCounter", "1000");
+  await set(page, "tests.0.rows.0.voltage", "14");
+  await expect(page.locator("#rpm-0")).toContainText("2000");
+  await expect(
+    page
+      .locator("#metrics table tr")
+      .filter({
+        has: page.getByRole("rowheader", {
+          name: "Counter engine (RPM)",
+          exact: true,
+        }),
+      }),
+  ).toContainText("400");
+  await expect(page.locator("#metrics table")).toContainText("Voltage");
+  await page.locator('[data-step="5"]').click();
+  await set(page, "values.excessActualCounter", "1200");
+  await expect(page.locator("#excessResults")).toContainText("2400");
+  await expect(page.locator("#excessResults")).toContainText("3600");
+});
+test("legacy draft conversion creates a workbook copy and preserves original history", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.evaluate(() => {
+    const d = JSON.parse(localStorage.getItem("pump-service-draft-v1"));
+    delete d.calculationVersion;
+    d.id = "legacy-original";
+    d.values = { counterRatio: "2", ratio150: "1.5", department: "Legacy FD" };
+    d.tests[0].rows[0] = { actualCounter: "1000" };
+    localStorage.setItem("pump-service-draft-v1", JSON.stringify(d));
+    localStorage.setItem("pump-service-tests-v1", JSON.stringify([d]));
+  });
+  await page.reload();
+  await expect(page.locator("#calculationStatus")).toContainText(
+    "Legacy record",
+  );
+  await page.locator('[data-step="6"]').click();
+  page.once("dialog", (d) => d.accept());
+  await page
+    .getByRole("button", {
+      name: "Copy with workbook calculations",
+      exact: true,
+    })
+    .click();
+  await expect(page.locator("#calculationStatus")).toContainText(
+    "Fields and formulas matched",
+  );
+  const records = await page.evaluate(() => ({
+    draft: JSON.parse(localStorage.getItem("pump-service-draft-v1")),
+    history: JSON.parse(localStorage.getItem("pump-service-tests-v1")),
+  }));
+  expect(records.draft.id).not.toBe("legacy-original");
+  expect(records.history[0].id).toBe("legacy-original");
+  expect(records.history[0].calculationVersion).toBeUndefined();
+  expect(records.draft.values.department).toBe("Legacy FD");
 });

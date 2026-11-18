@@ -39,6 +39,7 @@ test("numbers and averages preserve zero and signed readings, exclude blanks and
 });
 test("retained legacy RPM arithmetic and averages", () => {
   let d = fresh();
+  delete d.calculationVersion;
   d.values = { counterRatio: "2", ratio150: "1.5" };
   d.tests[0].rows[0] = { actualCounter: "1000", gpm: "1500" };
   d.tests[0].rows[1] = { actualCounter: "1200", gpm: "1400" };
@@ -119,8 +120,9 @@ test("merge never overwrites conflicts and retains existing histories", () => {
   assert.equal(r.conflicts, 1);
 });
 
-test("all reported average columns use only valid readings", () => {
+test("legacy average columns use only valid readings", () => {
   const d = fresh();
+  delete d.calculationVersion;
   for (let i = 0; i < 3; i++) {
     d.values["ratio" + [150, 200, 250][i]] = "1.25";
     d.values.counterRatio = "2";
@@ -151,6 +153,10 @@ test("all reported average columns use only valid readings", () => {
       engine: 1100,
       tach: 1100,
       pump: 1375,
+      voltage: null,
+      transTemp: null,
+      oilPressure: null,
+      waterTemp: null,
     });
   }
 });

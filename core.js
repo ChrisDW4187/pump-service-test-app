@@ -1,3 +1,4 @@
+import { WORKBOOK_VERSION, numericColumns } from "./workbook.js";
 import { specs, apparatus, setup, reading, extra } from "./schema.js";
 export const STORE = "pump-service-tests-v1",
   DRAFT = "pump-service-draft-v1";
@@ -27,6 +28,7 @@ export function fresh() {
   return {
     id: crypto.randomUUID(),
     created: new Date().toISOString(),
+    calculationVersion: WORKBOOK_VERSION,
     values: {},
     tests: specs.map((s) => ({
       layout: "",
@@ -38,15 +40,45 @@ export function fresh() {
     })),
   };
 }
+export const usesWorkbook = (d) => d.calculationVersion === WORKBOOK_VERSION;
+const blank = (v) => v == null || String(v).trim() === "";
+function product(d, a, b) {
+  if (usesWorkbook(d)) {
+    const x = blank(a) ? 0 : number(a),
+      y = blank(b) ? 0 : number(b);
+    return x === null || y === null || !Number.isFinite(x * y) ? null : x * y;
+  }
+  const x = number(a),
+    y = number(b);
+  return x === null || y === null || y <= 0 || !Number.isFinite(x * y)
+    ? null
+    : x * y;
+}
 export function engineCounter(d, r) {
-  const v = number(r.actualCounter),
-    k = number(d.values.counterRatio);
-  return v === null || k === null || k <= 0 ? null : v * k;
+  return product(d, r.actualCounter, d.values.counterRatio);
 }
 export function pumpCounter(d, r, i) {
-  const e = engineCounter(d, r),
-    k = number(d.values["ratio" + specs[i].psi]);
-  return e === null || k === null || k <= 0 ? null : e * k;
+  const e = engineCounter(d, r);
+  return e === null ? null : product(d, e, d.values["ratio" + specs[i].psi]);
+}
+export function excessResults(d) {
+  const engine = product(
+    d,
+    d.values.excessActualCounter,
+    d.values.counterRatio,
+  );
+  return {
+    engine,
+    pump: engine === null ? null : product(d, engine, d.values.ratio150),
+  };
+}
+export function cloneWithWorkbook(d) {
+  const copy = structuredClone(d);
+  copy.id = crypto.randomUUID();
+  copy.created = new Date().toISOString();
+  copy.calculationVersion = WORKBOOK_VERSION;
+  delete copy.completed;
+  return copy;
 }
 export function average(rows, key, compute) {
   const a = rows
@@ -54,16 +86,36 @@ export function average(rows, key, compute) {
     .filter((v) => v !== null && Number.isFinite(v));
   return a.length ? a.reduce((a, b) => a + b, 0) / a.length : null;
 }
+export function rowValues(d, r, i) {
+  return Object.fromEntries(
+    numericColumns.map(([, key, , input]) => [
+      key,
+      key === "engine"
+        ? engineCounter(d, r)
+        : key === "pump"
+          ? pumpCounter(d, r, i)
+          : number(r[input || key]),
+    ]),
+  );
+}
+export function sectionStats(d, i) {
+  const rows = d.tests[i].rows.map((r) => rowValues(d, r, i)),
+    totals = {},
+    averages = {};
+  for (const [, key] of numericColumns) {
+    const values = rows
+      .map((r) => r[key])
+      .filter((v) => v !== null && Number.isFinite(v));
+    // Excel SUM of empty raw cells is 0; AVERAGE without numbers is #DIV/0! (shown as —).
+    const sum = values.reduce((a, b) => a + b, 0);
+    totals[key] = Number.isFinite(sum) ? sum : null;
+    averages[key] =
+      values.length && Number.isFinite(sum) ? sum / values.length : null;
+  }
+  return { totals, averages };
+}
 export function results(d, i) {
-  const r = d.tests[i].rows;
-  return Object.fromEntries([
-    ...["pitot", "gpm", "apparatusPressure", "testPressure", "suction"].map(
-      (k) => [k, average(r, k)],
-    ),
-    ["engine", average(r, null, (r) => engineCounter(d, r))],
-    ["tach", average(r, "apparatusTach")],
-    ["pump", average(r, null, (r) => pumpCounter(d, r, i))],
-  ]);
+  return sectionStats(d, i).averages;
 }
 export function entries(d) {
   const a = [...apparatus, ...setup, ...extra, ...resultFields].map(
@@ -157,6 +209,10 @@ export function validateRecord(d) {
     d.tests.length !== 3
   )
     throw Error("Invalid test record");
+  if (d.calculationVersion != null && d.calculationVersion !== WORKBOOK_VERSION)
+    throw Error(
+      "Unsupported calculation version; update the app before importing this record.",
+    );
   const scalar = (v) =>
     typeof v === "string" ||
     (typeof v === "number" && Number.isFinite(v)) ||

@@ -1,10 +1,10 @@
 {
   "name": "pump-service-test-app",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tests/core.test.js",
+    "test": "node --test tests/core.test.js tests/workbook.test.js",
     "test:e2e": "playwright test",
     "serve": "python3 -m http.server 4173"
   },
